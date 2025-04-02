@@ -1,0 +1,119 @@
+// 1. 대상 요소 선택자 (XPath + querySelector 기반)
+const CHAT_INPUT_XPATHS = [
+  "/html/body/div[1]/div[2]/div[2]/div[2]/div[1]/form/div/textarea",
+  "/html/body/div[1]/div[2]/div[2]/div[2]/div[2]/form/div/textarea"
+];
+const CHAT_INPUT_SELECTOR = "textarea[name='message']";
+const SEND_BUTTON_XPATH = "/html/body/div[1]/div[2]/div[2]/div[2]/div[1]/form/div/button";
+const SEND_BUTTON_SELECTOR = "button[type='submit']";
+
+// 2. 설정값
+const MESSAGES = [
+  "New York is incredible!",
+  "I've always wanted to visit Tokyo.",
+  "Tell me something interesting!",
+  "Amazing! What else should I know?",
+  "Sounds cool! What's next?",
+  "Barcelona is on my bucket list.",
+  "Let's plan a trip to Sydney!",
+  "Can you share more details?",
+  "This is exciting! Tell me more.",
+  "Wow! Any other recommendations?"
+];
+const DELAY_BETWEEN_CHARS = 50;
+const DELAY_BEFORE_SEND = 500;
+const MESSAGE_COUNT = 11;
+
+// 3. XPath 기반 요소 찾기 함수
+function getElementByXPath(xpath) {
+  return document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+}
+
+// 4. 사용 가능한 입력창 찾기
+function getAvailableChatInput() {
+  for (let xpath of CHAT_INPUT_XPATHS) {
+    let input = getElementByXPath(xpath);
+    if (input) return input;
+  }
+  return document.querySelector(CHAT_INPUT_SELECTOR);
+}
+
+// 5. 사용 가능한 전송 버튼 찾기
+function getAvailableSendButton() {
+  return getElementByXPath(SEND_BUTTON_XPATH) || document.querySelector(SEND_BUTTON_SELECTOR);
+}
+
+// 6. 이벤트 생성 함수
+function createHumanLikeEvent(type, key, keyCode) {
+  return new KeyboardEvent(type, {
+    key: key,
+    code: key,
+    keyCode: keyCode,
+    which: keyCode,
+    bubbles: true,
+    cancelable: true,
+    composed: true
+  });
+}
+
+// 7. 메시지 전송 함수
+async function sendMessageLikeHuman(text) {
+  const input = getAvailableChatInput();
+  const sendBtn = getAvailableSendButton();
+  
+  if (!input) return console.error('❌ 입력창을 찾을 수 없습니다.');
+  if (!sendBtn) return console.error('❌ 전송 버튼을 찾을 수 없습니다.');
+
+  input.focus();
+  input.click();
+
+  const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+    Object.getPrototypeOf(input), 
+    'value'
+  ).set;
+  nativeInputValueSetter.call(input, text);
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+
+  for (let i = 0; i < text.length; i++) {
+    input.dispatchEvent(createHumanLikeEvent('keydown', text[i], text.charCodeAt(i)));
+    input.dispatchEvent(createHumanLikeEvent('keypress', text[i], text.charCodeAt(i)));
+    await new Promise(r => setTimeout(r, DELAY_BETWEEN_CHARS));
+    input.dispatchEvent(createHumanLikeEvent('keyup', text[i], text.charCodeAt(i)));
+  }
+
+  await new Promise(r => setTimeout(r, DELAY_BEFORE_SEND));
+  input.dispatchEvent(createHumanLikeEvent('keydown', 'Enter', 13));
+  sendBtn.click();
+
+  console.log(`✅ [${new Date().toLocaleTimeString()}] 전송 성공: ${text}`);
+}
+
+// 8. 10초 간격 실행 시스템 (11회 실행 후 중지)
+let messageIndex = 0;
+let isSending = false;
+
+const sendMessages = async () => {
+  for (let i = 0; i < MESSAGE_COUNT; i++) {
+    if (isSending) return;
+    isSending = true;
+
+    await sendMessageLikeHuman(MESSAGES[i % MESSAGES.length]);
+
+    messageIndex++;
+    isSending = false;
+
+    if (i < MESSAGE_COUNT - 1) {
+      await new Promise(r => setTimeout(r, 10 * 1000));
+    }
+  }
+
+  console.log("🚀 11번 메시지 전송 완료! 24시간 후 다시 실행합니다.");
+  
+  setTimeout(() => {
+    messageIndex = 0;
+    sendMessages();
+  }, 24 * 60 * 60 * 1000); // 하루 후 재실행
+};
+
+// 실행 시작
+sendMessages();
